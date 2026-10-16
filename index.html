@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a3f28">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ป๊อกเด้ง">
 <title>ป๊อกเด้ง ออนไลน์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -111,6 +118,9 @@ details.panel summary{cursor:pointer;font-weight:600;color:var(--mut)}
 @keyframes sp{to{transform:rotate(360deg)}}
 #toast{position:fixed;left:50%;top:14px;transform:translateX(-50%) translateY(-120%);background:#1b1b1b;color:#fff;padding:10px 16px;border-radius:12px;transition:transform .25s;z-index:10;max-width:90vw;text-align:center;font-size:15px}
 #toast.on{transform:translateX(-50%) translateY(0)}
+.inst{border-color:var(--gold);color:var(--gold)}
+.insthint{background:rgba(0,0,0,.25);border:1px dashed var(--line);border-radius:12px;padding:10px 12px;font-size:14px;color:var(--mut);line-height:1.55}
+.insthint b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -126,6 +136,7 @@ details.panel summary{cursor:pointer;font-weight:600;color:var(--mut)}
    ========================================================= */
 const SUITS=['♠','♥','♦','♣'];
 const RANKS=['','A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const ONLINE=true;
 const START_CHIPS=1000, MAX_SEATS=4, PREFIX='kgpd-';
 const BOT_NAMES=['บอทสมชาย','บอทมาลี','บอทป๋าเปี๊ยก','บอทน้องฟ้า'];
 const PEER_OPTS={debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}};
@@ -456,7 +467,7 @@ function showLost(m){lost=m;render()}
 
 function render(){
   const app=$('#app');
-  if(screen==='home'){app.innerHTML=homeHtml();const q=new URLSearchParams(location.search).get('room');if(q)$('#cd').value=q.toUpperCase();return}
+  if(screen==='home'){app.innerHTML=homeHtml();const q=new URLSearchParams(location.search).get('room');if(q&&$('#cd'))$('#cd').value=q.toUpperCase();return}
   if(screen==='connecting'&&!lost){app.innerHTML=`<div class="ov"><div class="box"><div class="spin"></div><div>${isHost?'กำลังสร้างห้อง…':'กำลังเข้าห้อง '+esc(joinCode)+'…'}</div><button class="btn ghost" data-a="home">ยกเลิก</button></div></div>`;return}
   app.innerHTML=(V?gameHtml():'')+(lost?`<div class="ov"><div class="box"><div class="big">หลุดการเชื่อมต่อ</div><div class="small">${esc(lost)}</div><button class="btn gold" data-a="retry">ลองเข้าใหม่</button><button class="btn ghost" data-a="home">กลับหน้าแรก</button></div></div>`:'');
 }
@@ -467,10 +478,12 @@ function homeHtml(){
   <div class="sub">เล่นพร้อมกันกับเพื่อน 2–4 คน · ชิปสมมติ ไม่ใช้เงินจริง</div>
   <div class="lbl">ชื่อของคุณ</div>
   <input type="text" id="nm" maxlength="12" placeholder="เช่น ต้น" value="${esc(myName)}">
-  <button class="btn gold" data-a="create">สร้างห้อง (เป็นเจ้ามือ)</button>
+  ${ONLINE?`<button class="btn gold" data-a="create">สร้างห้อง (เป็นเจ้ามือ)</button>
   <div class="or">— หรือเข้าห้องเพื่อน —</div>
   <div class="row"><input type="text" id="cd" maxlength="6" placeholder="รหัสห้อง" autocomplete="off"><button class="btn" data-a="join">เข้าห้อง</button></div>
-  <button class="btn ghost" data-a="practice">ฝึกเล่นกับบอท (ไม่ต้องใช้เน็ต)</button>
+  <button class="btn ghost" data-a="practice">ฝึกเล่นกับบอท (ไม่ต้องใช้เน็ต)</button>`:`<button class="btn gold" data-a="practice">เริ่มเล่นกับบอท</button>
+  <div class="or">ลิงก์นี้เล่นกับบอทเท่านั้น · เล่นกับเพื่อนต้องเปิดจากลิงก์ GitHub Pages</div>`}
+  ${installHtml()}
   <details class="rules"><summary>กติกาป๊อกเด้ง</summary><ul>
     <li>ทุกคนได้ไพ่ 2 ใบ นับแต้มเฉพาะหลักหน่วย (A=1, 10/J/Q/K=0)</li>
     <li>2 ใบได้ 8 หรือ 9 = <b>ป๊อก</b> เปิดทันที ไม่จั่ว · ป๊อก 9 ชนะป๊อก 8</li>
@@ -607,6 +620,7 @@ document.addEventListener('click',e=>{
     case 'home':goHome(false);break;
     case 'retry':startJoin(joinCode);break;
     case 'share':share();break;
+    case 'install':doInstall();break;
     case 'bet':{const me=V.seats.find(s=>s.id===myId);send({t:'bet',amt:Math.min(me.chips,me.bet+(+b.dataset.v))});break}
     case 'betclear':send({t:'bet',amt:0});break;
     case 'kick':case 'setdealer':send({t:a,id:b.dataset.id});break;
@@ -616,6 +630,29 @@ document.addEventListener('click',e=>{
 document.addEventListener('toggle',e=>{if(e.target.classList&&e.target.classList.contains('panel'))panelOpen=e.target.open},true);
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&screen==='home'){if(document.activeElement&&document.activeElement.id==='cd')$('[data-a=join]').click()}});
 window.addEventListener('beforeunload',e=>{if(isHost&&G&&!G.practice&&G.seats.some(s=>s.id!==myId&&s.online&&!s.bot)){e.preventDefault();e.returnValue=''}});
+
+/* ================= ติดตั้งเป็นแอพ ================= */
+let installEvt=null;
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}};
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isMobile=/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(screen==='home')render()});
+window.addEventListener('appinstalled',()=>{installEvt=null;toast('ติดตั้งแล้ว เปิดจากหน้าจอโฮมได้เลย');if(screen==='home')render()});
+function installHtml(){
+  if(!ONLINE||isStandalone()||!location.protocol.startsWith('http'))return'';
+  if(installEvt)return`<button class="btn ghost inst" data-a="install">📲 ติดตั้งเป็นแอพบนมือถือ</button>`;
+  if(isIOS)return`<div class="insthint">📲 <b>ติดตั้งบน iPhone/iPad:</b> เปิดด้วย Safari กดปุ่มแชร์ <b>⬆︎</b> แล้วเลือก <b>"เพิ่มไปยังหน้าจอโฮม"</b></div>`;
+  if(isMobile)return`<div class="insthint">📲 <b>ติดตั้งเป็นแอพ:</b> กดเมนู <b>⋮</b> ของเบราว์เซอร์ แล้วเลือก <b>"ติดตั้งแอป"</b> หรือ <b>"เพิ่มลงในหน้าจอหลัก"</b></div>`;
+  return'';
+}
+async function doInstall(){
+  if(!installEvt){toast('ใช้เมนูของเบราว์เซอร์เพื่อติดตั้ง');return}
+  const ev=installEvt;installEvt=null;
+  try{ev.prompt();await ev.userChoice}catch(e){}
+  render();
+}
+if(ONLINE&&'serviceWorker' in navigator&&location.protocol.startsWith('http'))
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 render();
 </script>
 </body>
